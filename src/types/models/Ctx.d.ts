@@ -56,7 +56,7 @@ type NotificationItem = {
     metaId: string,
     videoId: string,
     videoReleased: string,
-}
+};
 
 type SearchHistoryItem = {
     query: string,
@@ -67,8 +67,16 @@ type SearchHistoryItem = {
 
 type SearchHistory = SearchHistoryItem[];
 
+type StreamingServerUrl = {
+    url: string,
+    mtime: Date,
+};
+
+type StreamingServerUrls = StreamingServerUrl[];
+
 type Ctx = {
     profile: Profile,
     notifications: Notifications,
     searchHistory: SearchHistory,
+    streamingServerUrls: StreamingServerUrls,
 };

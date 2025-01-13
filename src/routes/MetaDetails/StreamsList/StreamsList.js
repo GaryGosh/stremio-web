@@ -5,23 +5,36 @@ const PropTypes = require('prop-types');
 const classnames = require('classnames');
 const { useTranslation } = require('react-i18next');
 const { default: Icon } = require('@stremio/stremio-icons/react');
-const { Button, Image, Multiselect } = require('stremio/common');
+const { Button, Image, Multiselect } = require('stremio/components');
 const { useServices } = require('stremio/services');
 const Stream = require('./Stream');
 const styles = require('./styles');
+const { usePlatform } = require('stremio/common');
 
 const ALL_ADDONS_KEY = 'ALL';
 
 const StreamsList = ({ className, video, ...props }) => {
     const { t } = useTranslation();
     const { core } = useServices();
+    const platform = usePlatform();
+    const streamsContainerRef = React.useRef(null);
     const [selectedAddon, setSelectedAddon] = React.useState(ALL_ADDONS_KEY);
     const onAddonSelected = React.useCallback((event) => {
+        streamsContainerRef.current.scrollTo({ top: 0, left: 0, behavior: platform.name === 'ios' ? 'smooth' : 'instant' });
         setSelectedAddon(event.value);
-    }, []);
+    }, [platform]);
     const backButtonOnClick = React.useCallback(() => {
-        window.history.back();
-    }, []);
+        if (video.deepLinks && typeof video.deepLinks.metaDetailsVideos === 'string') {
+            window.location.replace(video.deepLinks.metaDetailsVideos + (
+                typeof video.season === 'number' ?
+                    `?${new URLSearchParams({'season': video.season})}`
+                    :
+                    null
+            ));
+        } else {
+            window.history.back();
+        }
+    }, [video]);
     const countLoadingAddons = React.useMemo(() => {
         return props.streams.filter((stream) => stream.content.type === 'Loading').length;
     }, [props.streams]);
@@ -78,6 +91,30 @@ const StreamsList = ({ className, video, ...props }) => {
     }, [streamsByAddon, selectedAddon]);
     return (
         <div className={classnames(className, styles['streams-list-container'])}>
+            <div className={styles['select-choices-wrapper']}>
+                {
+                    video ?
+                        <React.Fragment>
+                            <Button className={classnames(styles['button-container'], styles['back-button-container'])} tabIndex={-1} onClick={backButtonOnClick}>
+                                <Icon className={styles['icon']} name={'chevron-back'} />
+                            </Button>
+                            <div className={styles['episode-title']}>
+                                {`S${video?.season}E${video?.episode} ${(video?.title)}`}
+                            </div>
+                        </React.Fragment>
+                        :
+                        null
+                }
+                {
+                    Object.keys(streamsByAddon).length > 1 ?
+                        <Multiselect
+                            {...selectableOptions}
+                            className={styles['select-input-container']}
+                        />
+                        :
+                        null
+                }
+            </div>
             {
                 props.streams.length === 0 ?
                     <div className={styles['message-container']}>
@@ -109,31 +146,7 @@ const StreamsList = ({ className, video, ...props }) => {
                                         :
                                         null
                                 }
-                                <div className={styles['select-choices-wrapper']}>
-                                    {
-                                        video ?
-                                            <React.Fragment>
-                                                <Button className={classnames(styles['button-container'], styles['back-button-container'])} tabIndex={-1} onClick={backButtonOnClick}>
-                                                    <Icon className={styles['icon']} name={'chevron-back'} />
-                                                </Button>
-                                                <div className={styles['episode-title']}>
-                                                    {`S${video?.season}E${video?.episode} ${(video?.title)}`}
-                                                </div>
-                                            </React.Fragment>
-                                            :
-                                            null
-                                    }
-                                    {
-                                        Object.keys(streamsByAddon).length > 1 ?
-                                            <Multiselect
-                                                {...selectableOptions}
-                                                className={styles['select-input-container']}
-                                            />
-                                            :
-                                            null
-                                    }
-                                </div>
-                                <div className={styles['streams-container']}>
+                                <div className={styles['streams-container']} ref={streamsContainerRef}>
                                     {filteredStreams.map((stream, index) => (
                                         <Stream
                                             key={index}

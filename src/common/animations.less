@@ -20,3 +20,35 @@
         transform: translateY(0);
     }
 }
+
+:global(.animation-slide-up) {
+    :local {
+        animation-name: slide-up;
+    }
+
+    animation-timing-function: ease-out;
+    animation-duration: 0.1s;
+}
+
+@keyframes slide-up {
+    0% {
+        transform: translateY(100%);
+    }
+
+    100% {
+        transform: translateY(0%);
+    }
+}
+
+.slide-left-enter {
+    transform: translateX(100%);
+}
+
+.slide-left-active {
+    transform: translateX(0%);
+    transition: transform 0.3s cubic-bezier(0.32, 0, 0.67, 0);
+}
+
+.slide-left-exit {
+    transform: translateX(100%);
+}

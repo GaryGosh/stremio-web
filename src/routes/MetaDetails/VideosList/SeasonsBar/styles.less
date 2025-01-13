@@ -3,7 +3,7 @@
 @import (reference) '~@stremio/stremio-colors/less/stremio-colors.less';
 @import (reference) '~stremio/common/screen-sizes.less';
 
-:import('~stremio/common/Multiselect/styles.less') {
+:import('~stremio/components/Multiselect/styles.less') {
     multiselect-menu-container: menu-container;
     multiselect-label: label;
     multiselect-icon: icon;
@@ -34,10 +34,6 @@
 
         &:hover, &:focus {
             background-color: var(--overlay-color);
-        }
-
-        &:focus {
-            background-color: var(--primary-foreground-color);
         }
 
         &>:first-child {
@@ -77,7 +73,6 @@
         }
 
         .multiselect-menu-container {
-            max-height: calc(3.2rem * 7);
             overflow: auto;
         }
     }
@@ -86,11 +81,5 @@
 @media only screen and (max-width: @minimum) {
     .seasons-bar-container {
         height: 6rem;
-
-        .seasons-popup-label-container {
-            .multiselect-menu-container {
-                max-height: calc(3.2rem * 3);
-            }
-        }
     }
 }

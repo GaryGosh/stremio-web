@@ -51,7 +51,7 @@ type BehaviorHints = {
     hasScheduledVideos: boolean,
 };
 
-type PosterShape = 'square' | 'landscape' | 'poster' | null; 
+type PosterShape = 'square' | 'landscape' | 'poster' | null;
 
 type Catalog<T, D = any> = {
     label?: string,
@@ -60,4 +60,11 @@ type Catalog<T, D = any> = {
     content: T,
     installed?: boolean,
     deepLinks?: D,
+};
+
+type AudioTrack = {
+    id: string,
+    label: string,
+    lang: string,
+    origin: string,
 };

@@ -5,16 +5,21 @@ const PropTypes = require('prop-types');
 const classnames = require('classnames');
 const { useTranslation } = require('react-i18next');
 const { default: Icon } = require('@stremio/stremio-icons/react');
-const { AddonDetailsModal, Button, Image, Multiselect, MainNavBars, TextInput, SearchBar, SharePrompt, ModalDialog, useBinaryState, withCoreSuspender } = require('stremio/common');
+const { usePlatform, useBinaryState, withCoreSuspender } = require('stremio/common');
+const { AddonDetailsModal, Button, Image, MainNavBars, Multiselect, ModalDialog, SearchBar, SharePrompt, TextInput } = require('stremio/components');
+const { useServices } = require('stremio/services');
 const Addon = require('./Addon');
 const useInstalledAddons = require('./useInstalledAddons');
 const useRemoteAddons = require('./useRemoteAddons');
 const useAddonDetailsTransportUrl = require('./useAddonDetailsTransportUrl');
 const useSelectableInputs = require('./useSelectableInputs');
 const styles = require('./styles');
+const { AddonPlaceholder } = require('./AddonPlaceholder');
 
 const Addons = ({ urlParams, queryParams }) => {
     const { t } = useTranslation();
+    const platform = usePlatform();
+    const { core } = useServices();
     const installedAddons = useInstalledAddons(urlParams);
     const remoteAddons = useRemoteAddons(urlParams);
     const [addonDetailsTransportUrl, setAddonDetailsTransportUrl] = useAddonDetailsTransportUrl(urlParams, queryParams);
@@ -55,12 +60,30 @@ const Addons = ({ urlParams, queryParams }) => {
     const onAddonShare = React.useCallback((event) => {
         setSharedAddon(event.dataset.addon);
     }, []);
-    const onAddonToggle = React.useCallback((event) => {
+    const onAddonInstall = React.useCallback((event) => {
+        core.transport.dispatch({
+            action: 'Ctx',
+            args: {
+                action: 'InstallAddon',
+                args: event.dataset.addon,
+            }
+        });
+    }, []);
+    const onAddonUninstall = React.useCallback((event) => {
+        core.transport.dispatch({
+            action: 'Ctx',
+            args: {
+                action: 'UninstallAddon',
+                args: event.dataset.addon,
+            }
+        });
+    }, []);
+    const onAddonConfigure = React.useCallback((event) => {
+        platform.openExternal(event.dataset.addon.transportUrl.replace('manifest.json', 'configure'));
+    }, []);
+    const onAddonOpen = React.useCallback((event) => {
         setAddonDetailsTransportUrl(event.dataset.addon.transportUrl);
     }, [setAddonDetailsTransportUrl]);
-    const onAddonConfigure = React.useCallback((event) => {
-        window.open(event.dataset.addon.transportUrl.replace('manifest.json', 'configure'));
-    }, []);
     const closeAddonDetails = React.useCallback(() => {
         setAddonDetailsTransportUrl(null);
     }, [setAddonDetailsTransportUrl]);
@@ -93,7 +116,7 @@ const Addons = ({ urlParams, queryParams }) => {
                     <div className={styles['spacing']} />
                     <Button className={styles['add-button-container']} title={t('ADD_ADDON')} onClick={openAddAddonModal}>
                         <Icon className={styles['icon']} name={'add'} />
-                        <div className={styles['add-button-label']}>{ t('ADD_ADDON') }</div>
+                        <div className={styles['add-button-label']}>{t('ADD_ADDON')}</div>
                     </Button>
                     <SearchBar
                         className={styles['search-bar']}
@@ -133,8 +156,10 @@ const Addons = ({ urlParams, queryParams }) => {
                                                     types={addon.manifest.types}
                                                     behaviorHints={addon.manifest.behaviorHints}
                                                     installed={addon.installed}
-                                                    onToggle={onAddonToggle}
+                                                    onInstall={onAddonInstall}
+                                                    onUninstall={onAddonUninstall}
                                                     onConfigure={onAddonConfigure}
+                                                    onOpen={onAddonOpen}
                                                     onShare={onAddonShare}
                                                     dataset={{ addon }}
                                                 />
@@ -149,8 +174,10 @@ const Addons = ({ urlParams, queryParams }) => {
                                 </div>
                                 :
                                 remoteAddons.catalog.content.type === 'Loading' ?
-                                    <div className={styles['message-container']}>
-                                        Loading!
+                                    <div className={styles['addons-list-container']}>
+                                        {Array.from({ length: 6 }).map((_, index) => (
+                                            <AddonPlaceholder key={index} className={styles['addon']} />
+                                        ))}
                                     </div>
                                     :
                                     <div className={styles['addons-list-container']}>
@@ -169,8 +196,10 @@ const Addons = ({ urlParams, queryParams }) => {
                                                         types={addon.manifest.types}
                                                         behaviorHints={addon.manifest.behaviorHints}
                                                         installed={addon.installed}
-                                                        onToggle={onAddonToggle}
+                                                        onInstall={onAddonInstall}
+                                                        onUninstall={onAddonUninstall}
                                                         onConfigure={onAddonConfigure}
+                                                        onOpen={onAddonOpen}
                                                         onShare={onAddonShare}
                                                         dataset={{ addon }}
                                                     />
@@ -178,8 +207,10 @@ const Addons = ({ urlParams, queryParams }) => {
                                         }
                                     </div>
                             :
-                            <div className={styles['message-container']}>
-                                No select
+                            <div className={styles['addons-list-container']}>
+                                {Array.from({ length: 6 }).map((_, index) => (
+                                    <AddonPlaceholder key={index} className={styles['addon']} />
+                                ))}
                             </div>
                 }
             </div>
@@ -204,7 +235,7 @@ const Addons = ({ urlParams, queryParams }) => {
                         title={t('ADD_ADDON')}
                         buttons={addAddonModalButtons}
                         onCloseRequest={closeAddAddonModal}>
-                        <div className={styles['notice']}>{ t('ADD_ADDON_DESCRIPTION') }</div>
+                        <div className={styles['notice']}>{t('ADD_ADDON_DESCRIPTION')}</div>
                         <TextInput
                             ref={addAddonUrlInputRef}
                             className={styles['addon-url-input']}

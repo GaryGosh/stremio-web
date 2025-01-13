@@ -1,16 +1,18 @@
 // Copyright (C) 2017-2023 Smart code 203358507
 
 const React = require('react');
+const { useTranslation } = require('react-i18next');
 const PropTypes = require('prop-types');
 const classnames = require('classnames');
 const { default: Icon } = require('@stremio/stremio-icons/react');
 const { Modal, useRouteFocused } = require('stremio-router');
 const { useServices } = require('stremio/services');
-const { Button, Image, useBinaryState } = require('stremio/common');
+const { useBinaryState } = require('stremio/common');
+const { Button, Image } = require('stremio/components');
 const CredentialsTextInput = require('./CredentialsTextInput');
-const ConsentCheckbox = require('./ConsentCheckbox');
+const ConsentToggle = require('./ConsentToggle');
 const PasswordResetModal = require('./PasswordResetModal');
-const useFacebookToken = require('./useFacebookToken');
+const useFacebookLogin = require('./useFacebookLogin');
 const styles = require('./styles');
 
 const SIGNUP_FORM = 'signup';
@@ -18,8 +20,9 @@ const LOGIN_FORM = 'login';
 
 const Intro = ({ queryParams }) => {
     const { core } = useServices();
+    const { t } = useTranslation();
     const routeFocused = useRouteFocused();
-    const getFacebookToken = useFacebookToken();
+    const [startFacebookLogin, stopFacebookLogin] = useFacebookLogin();
     const emailRef = React.useRef(null);
     const passwordRef = React.useRef(null);
     const confirmPasswordRef = React.useRef(null);
@@ -80,15 +83,17 @@ const Intro = ({ queryParams }) => {
     );
     const loginWithFacebook = React.useCallback(() => {
         openLoaderModal();
-        getFacebookToken()
-            .then((accessToken) => {
+        startFacebookLogin()
+            .then(({ email, password }) => {
                 core.transport.dispatch({
                     action: 'Ctx',
                     args: {
                         action: 'Authenticate',
                         args: {
-                            type: 'Facebook',
-                            token: accessToken,
+                            type: 'Login',
+                            email,
+                            password,
+                            facebook: true
                         }
                     }
                 });
@@ -97,6 +102,10 @@ const Intro = ({ queryParams }) => {
                 closeLoaderModal();
                 dispatch({ type: 'error', error: error.message });
             });
+    }, []);
+    const cancelLoginWithFacebook = React.useCallback(() => {
+        stopFacebookLogin();
+        closeLoaderModal();
     }, []);
     const loginWithEmail = React.useCallback(() => {
         if (typeof state.email !== 'string' || state.email.length === 0 || !emailRef.current.validity.valid) {
@@ -299,27 +308,27 @@ const Intro = ({ queryParams }) => {
                                     onChange={confirmPasswordOnChange}
                                     onSubmit={confirmPasswordOnSubmit}
                                 />
-                                <ConsentCheckbox
+                                <ConsentToggle
                                     ref={termsRef}
-                                    className={styles['consent-checkbox']}
+                                    className={styles['consent-toggle']}
                                     label={'I have read and agree with the Stremio'}
                                     link={'Terms and conditions'}
                                     href={'https://www.stremio.com/tos'}
                                     checked={state.termsAccepted}
                                     onToggle={toggleTermsAccepted}
                                 />
-                                <ConsentCheckbox
+                                <ConsentToggle
                                     ref={privacyPolicyRef}
-                                    className={styles['consent-checkbox']}
+                                    className={styles['consent-toggle']}
                                     label={'I have read and agree with the Stremio'}
                                     link={'Privacy Policy'}
                                     href={'https://www.stremio.com/privacy'}
                                     checked={state.privacyPolicyAccepted}
                                     onToggle={togglePrivacyPolicyAccepted}
                                 />
-                                <ConsentCheckbox
+                                <ConsentToggle
                                     ref={marketingRef}
-                                    className={styles['consent-checkbox']}
+                                    className={styles['consent-toggle']}
                                     label={'I agree to receive marketing communications from Stremio'}
                                     checked={state.marketingAccepted}
                                     onToggle={toggleMarketingAccepted}
@@ -383,6 +392,9 @@ const Intro = ({ queryParams }) => {
                         <div className={styles['loader-container']}>
                             <Icon className={styles['icon']} name={'person'} />
                             <div className={styles['label']}>Authenticating...</div>
+                            <Button className={styles['button']} onClick={cancelLoginWithFacebook}>
+                                {t('BUTTON_CANCEL')}
+                            </Button>
                         </div>
                     </Modal>
                     :

@@ -3,7 +3,7 @@
 @import (reference) '~@stremio/stremio-colors/less/stremio-colors.less';
 @import (reference) '~stremio/common/screen-sizes.less';
 
-:import('~stremio/common/Multiselect/styles.less') {
+:import('~stremio/components/Multiselect/styles.less') {
     multiselect-menu-container: menu-container;
     multiselect-label: label;
     multiselect-icon: icon;
@@ -108,7 +108,6 @@
 
         .select-input-container {
             min-width: 40%;
-            flex: 0 0 auto;
             flex-grow: 1;
             background: none;
 
@@ -125,7 +124,6 @@
             }
     
             .multiselect-menu-container {
-                max-height: calc(3.2rem * 7);
                 overflow: auto;
             }
         }

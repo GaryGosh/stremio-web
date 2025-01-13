@@ -7,11 +7,13 @@ const { useTranslation } = require('react-i18next');
 const { default: Icon } = require('@stremio/stremio-icons/react');
 const { useRouteFocused } = require('stremio-router');
 const { useServices } = require('stremio/services');
-const { Button, Checkbox, MainNavBars, Multiselect, ColorInput, TextInput, ModalDialog, useProfile, useStreamingServer, useBinaryState, withCoreSuspender, useToast } = require('stremio/common');
+const { useProfile, usePlatform, useStreamingServer, withCoreSuspender, useToast } = require('stremio/common');
+const { Button, ColorInput, MainNavBars, Multiselect, Toggle } = require('stremio/components');
 const useProfileSettingsInputs = require('./useProfileSettingsInputs');
 const useStreamingServerSettingsInputs = require('./useStreamingServerSettingsInputs');
 const useDataExport = require('./useDataExport');
 const styles = require('./styles');
+const { default: URLsManager } = require('./URLsManager/URLsManager');
 
 const GENERAL_SECTION = 'general';
 const PLAYER_SECTION = 'player';
@@ -25,6 +27,7 @@ const Settings = () => {
     const profile = useProfile();
     const [dataExport, loadDataExport] = useDataExport();
     const streamingServer = useStreamingServer();
+    const platform = usePlatform();
     const toast = useToast();
     const {
         interfaceLanguageSelect,
@@ -34,16 +37,15 @@ const Settings = () => {
         subtitlesBackgroundColorInput,
         subtitlesOutlineColorInput,
         audioLanguageSelect,
-        surroundSoundCheckbox,
+        surroundSoundToggle,
         seekTimeDurationSelect,
         seekShortTimeDurationSelect,
-        escExitFullscreenCheckbox,
+        escExitFullscreenToggle,
         playInExternalPlayerSelect,
         nextVideoPopupDurationSelect,
-        bingeWatchingCheckbox,
-        playInBackgroundCheckbox,
-        hardwareDecodingCheckbox,
-        streamingServerUrlInput
+        bingeWatchingToggle,
+        playInBackgroundToggle,
+        hardwareDecodingToggle,
     } = useProfileSettingsInputs(profile);
     const {
         streamingServerRemoteUrlInput,
@@ -52,34 +54,11 @@ const Settings = () => {
         torrentProfileSelect,
         transcodingProfileSelect,
     } = useStreamingServerSettingsInputs(streamingServer);
-    const [configureServerUrlModalOpen, openConfigureServerUrlModal, closeConfigureServerUrlModal] = useBinaryState(false);
-    const configureServerUrlInputRef = React.useRef(null);
-    const configureServerUrlOnSubmit = React.useCallback(() => {
-        streamingServerUrlInput.onChange(configureServerUrlInputRef.current.value);
-        closeConfigureServerUrlModal();
-    }, [streamingServerUrlInput]);
     const [traktAuthStarted, setTraktAuthStarted] = React.useState(false);
     const isTraktAuthenticated = React.useMemo(() => {
         return profile.auth !== null && profile.auth.user !== null && profile.auth.user.trakt !== null &&
             (Date.now() / 1000) < (profile.auth.user.trakt.created_at + profile.auth.user.trakt.expires_in);
     }, [profile.auth]);
-    const configureServerUrlModalButtons = React.useMemo(() => {
-        return [
-            {
-                className: styles['cancel-button'],
-                label: 'Cancel',
-                props: {
-                    onClick: closeConfigureServerUrlModal
-                }
-            },
-            {
-                label: 'Submit',
-                props: {
-                    onClick: configureServerUrlOnSubmit,
-                }
-            }
-        ];
-    }, [configureServerUrlOnSubmit]);
     const logoutButtonOnClick = React.useCallback(() => {
         core.transport.dispatch({
             action: 'Ctx',
@@ -90,7 +69,7 @@ const Settings = () => {
     }, []);
     const toggleTraktOnClick = React.useCallback(() => {
         if (!isTraktAuthenticated && profile.auth !== null && profile.auth.user !== null && typeof profile.auth.user._id === 'string') {
-            window.open(`https://www.strem.io/trakt/auth/${profile.auth.user._id}`);
+            platform.openExternal(`https://www.strem.io/trakt/auth/${profile.auth.user._id}`);
             setTraktAuthStarted(true);
         } else {
             core.transport.dispatch({
@@ -102,25 +81,20 @@ const Settings = () => {
         }
     }, [isTraktAuthenticated, profile.auth]);
     const subscribeCalendarOnClick = React.useCallback(() => {
-        const url = `webcal://www.strem.io/calendar/${profile.auth.user._id}.ics`;
-        window.open(url);
+        if (!profile.auth) return;
+
+        const protocol = platform.name === 'ios' ? 'webcal' : 'https';
+        const url = `${protocol}://www.strem.io/calendar/${profile.auth.user._id}.ics`;
+        platform.openExternal(url);
         toast.show({
             type: 'success',
-            title: 'Calendar has been added to your default caldendar app',
+            title: platform.name === 'ios' ? t('SETTINGS_SUBSCRIBE_CALENDAR_IOS_TOAST') : t('SETTINGS_SUBSCRIBE_CALENDAR_TOAST'),
             timeout: 25000
         });
-        //Stremio 4 emits not documented event subscribeCalendar
-    }, []);
+        // Stremio 4 emits not documented event subscribeCalendar
+    }, [profile.auth]);
     const exportDataOnClick = React.useCallback(() => {
         loadDataExport();
-    }, []);
-    const reloadStreamingServer = React.useCallback(() => {
-        core.transport.dispatch({
-            action: 'StreamingServer',
-            args: {
-                action: 'Reload'
-            }
-        });
     }, []);
     const onCopyRemoteUrlClick = React.useCallback(() => {
         if (streamingServer.remoteUrl) {
@@ -181,14 +155,13 @@ const Settings = () => {
     }, [isTraktAuthenticated, traktAuthStarted]);
     React.useEffect(() => {
         if (dataExport.exportUrl !== null && typeof dataExport.exportUrl === 'string') {
-            window.open(dataExport.exportUrl);
+            platform.openExternal(dataExport.exportUrl);
         }
     }, [dataExport.exportUrl]);
     React.useLayoutEffect(() => {
         if (routeFocused) {
             updateSelectedSectionId();
         }
-        closeConfigureServerUrlModal();
     }, [routeFocused]);
     return (
         <MainNavBars className={styles['settings-container']} route={'settings'}>
@@ -261,9 +234,14 @@ const Settings = () => {
                     </div>
                     <div className={styles['section-container']}>
                         <div className={classnames(styles['option-container'], styles['link-container'])}>
-                            <Button className={classnames(styles['option-input-container'], styles['link-input-container'])} title={t('SETTINGS_DATA_EXPORT')} tabIndex={-1} onClick={exportDataOnClick}>
-                                <div className={styles['label']}>{ t('SETTINGS_DATA_EXPORT') }</div>
-                            </Button>
+                            {
+                                profile.auth ?
+                                    <Button className={classnames(styles['option-input-container'], styles['link-input-container'])} title={t('SETTINGS_DATA_EXPORT')} tabIndex={-1} onClick={exportDataOnClick}>
+                                        <div className={styles['label']}>{ t('SETTINGS_DATA_EXPORT') }</div>
+                                    </Button>
+                                    :
+                                    null
+                            }
                         </div>
                         {
                             profile.auth !== null && profile.auth.user !== null && typeof profile.auth.user._id === 'string' ?
@@ -360,9 +338,9 @@ const Settings = () => {
                                     <div className={styles['option-name-container']}>
                                         <div className={styles['label']}>{ t('SETTINGS_FULLSCREEN_EXIT') }</div>
                                     </div>
-                                    <Checkbox
-                                        className={classnames(styles['option-input-container'], styles['checkbox-container'])}
-                                        {...escExitFullscreenCheckbox}
+                                    <Toggle
+                                        className={classnames(styles['option-input-container'], styles['toggle-container'])}
+                                        {...escExitFullscreenToggle}
                                     />
                                 </div>
                                 :
@@ -423,10 +401,10 @@ const Settings = () => {
                             <div className={styles['option-name-container']}>
                                 <div className={styles['label']}>{ t('SETTINGS_SURROUND_SOUND') }</div>
                             </div>
-                            <Checkbox
-                                className={classnames(styles['option-input-container'], styles['checkbox-container'])}
+                            <Toggle
+                                className={classnames(styles['option-input-container'], styles['toggle-container'])}
                                 tabIndex={-1}
-                                {...surroundSoundCheckbox}
+                                {...surroundSoundToggle}
                             />
                         </div>
                     </div>
@@ -457,11 +435,11 @@ const Settings = () => {
                             <div className={styles['option-name-container']}>
                                 <div className={styles['label']}>{ t('SETTINGS_PLAY_IN_BACKGROUND') }</div>
                             </div>
-                            <Checkbox
-                                className={classnames(styles['option-input-container'], styles['checkbox-container'])}
+                            <Toggle
+                                className={classnames(styles['option-input-container'], styles['toggle-container'])}
                                 disabled={true}
                                 tabIndex={-1}
-                                {...playInBackgroundCheckbox}
+                                {...playInBackgroundToggle}
                             />
                         </div>
                     </div>
@@ -474,9 +452,9 @@ const Settings = () => {
                             <div className={styles['option-name-container']}>
                                 <div className={styles['label']}>{ t('AUTO_PLAY') }</div>
                             </div>
-                            <Checkbox
-                                className={classnames(styles['option-input-container'], styles['checkbox-container'])}
-                                {...bingeWatchingCheckbox}
+                            <Toggle
+                                className={classnames(styles['option-input-container'], styles['toggle-container'])}
+                                {...bingeWatchingToggle}
                             />
                         </div>
                         <div className={styles['option-container']}>
@@ -508,53 +486,17 @@ const Settings = () => {
                             <div className={styles['option-name-container']}>
                                 <div className={styles['label']}>{ t('SETTINGS_HWDEC') }</div>
                             </div>
-                            <Checkbox
-                                className={classnames(styles['option-input-container'], styles['checkbox-container'])}
+                            <Toggle
+                                className={classnames(styles['option-input-container'], styles['toggle-container'])}
                                 disabled={true}
                                 tabIndex={-1}
-                                {...hardwareDecodingCheckbox}
+                                {...hardwareDecodingToggle}
                             />
                         </div>
                     </div>
                     <div ref={streamingServerSectionRef} className={styles['section-container']}>
                         <div className={styles['section-title']}>{ t('SETTINGS_NAV_STREAMING') }</div>
-                        <div className={styles['option-container']}>
-                            <Button className={classnames(styles['option-input-container'], styles['button-container'])} title={'Reload'} onClick={reloadStreamingServer}>
-                                <div className={styles['label']}>{ t('RELOAD') }</div>
-                            </Button>
-                        </div>
-                        <div className={styles['option-container']}>
-                            <div className={styles['option-name-container']}>
-                                <div className={styles['label']}>{ t('STATUS') }</div>
-                            </div>
-                            <div className={classnames(styles['option-input-container'], styles['info-container'])}>
-                                <div className={styles['label']}>
-                                    {
-                                        streamingServer.settings === null ?
-                                            'NotLoaded'
-                                            :
-                                            streamingServer.settings.type === 'Ready' ?
-                                                t('SETTINGS_SERVER_STATUS_ONLINE')
-                                                :
-                                                streamingServer.settings.type === 'Err' ?
-                                                    t('SETTINGS_SERVER_STATUS_ERROR')
-                                                    :
-                                                    streamingServer.settings.type
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                        <div className={styles['option-container']}>
-                            <div className={styles['option-name-container']}>
-                                <div className={styles['label']}>Url</div>
-                            </div>
-                            <div className={classnames(styles['option-input-container'], styles['configure-input-container'])}>
-                                <div className={styles['label']} title={streamingServerUrlInput.value}>{streamingServerUrlInput.value}</div>
-                                <Button className={styles['configure-button-container']} title={'Configure server url'} onClick={openConfigureServerUrlModal}>
-                                    <Icon className={styles['icon']} name={'settings'} />
-                                </Button>
-                            </div>
-                        </div>
+                        <URLsManager />
                         {
                             streamingServerRemoteUrlInput.value !== null ?
                                 <div className={styles['option-container']}>
@@ -688,6 +630,14 @@ const Settings = () => {
                         </div>
                         <div className={styles['option-container']}>
                             <div className={styles['option-name-container']}>
+                                <div className={styles['label']}>{ t('SETTINGS_SHORTCUT_MENU_AUDIO') }</div>
+                            </div>
+                            <div className={classnames(styles['option-input-container'], styles['shortcut-container'])}>
+                                <kbd>A</kbd>
+                            </div>
+                        </div>
+                        <div className={styles['option-container']}>
+                            <div className={styles['option-name-container']}>
                                 <div className={styles['label']}>{ t('SETTINGS_SHORTCUT_MENU_INFO') }</div>
                             </div>
                             <div className={classnames(styles['option-input-container'], styles['shortcut-container'])}>
@@ -717,7 +667,7 @@ const Settings = () => {
                             <div className={classnames(styles['option-input-container'], styles['shortcut-container'])}>
                                 <kbd>1</kbd>
                                 <div className={styles['label']}>{ t('SETTINGS_SHORTCUT_TO') }</div>
-                                <kbd>5</kbd>
+                                <kbd>6</kbd>
                             </div>
                         </div>
                         <div className={styles['option-container']}>
@@ -770,26 +720,6 @@ const Settings = () => {
                     </div>
                 </div>
             </div>
-            {
-                configureServerUrlModalOpen ?
-                    <ModalDialog
-                        className={styles['configure-server-url-modal-container']}
-                        title={t('SETTINGS_SERVER_CONFIGURE_TITLE')}
-                        buttons={configureServerUrlModalButtons}
-                        onCloseRequest={closeConfigureServerUrlModal}>
-                        <TextInput
-                            ref={configureServerUrlInputRef}
-                            autoFocus={true}
-                            className={styles['server-url-input']}
-                            type={'text'}
-                            defaultValue={streamingServerUrlInput.value}
-                            placeholder={t('SETTINGS_SERVER_CONFIGURE_INPUT')}
-                            onSubmit={configureServerUrlOnSubmit}
-                        />
-                    </ModalDialog>
-                    :
-                    null
-            }
         </MainNavBars>
     );
 };
